@@ -26,6 +26,8 @@
 <a name="constants-logger-levels"></a>
 ##Logger Levels
 For historical purposes, logger levels supports both integers and names which are intergchangble when calling a function that requires a logger level.
+
+Note: If setting the Logger level to a deprecated level, it will automatically default to `g_debug`.
 ###Numeric
 This is the preferred method
 <table border="0">
@@ -59,15 +61,15 @@ This is the preferred method
 	</tr>
 	<tr>
 		<td>g_timing</td>
-		<td>Logger level timing (32).</td>
+		<td>*Deprecated* Logger level timing (32).</td>
 	</tr>
 	<tr>
 		<td>g_sys_context</td>
-		<td>Logger level sys context (64). This is applicable for logging system variables.</td>
+		<td>*Deprecated* Logger level sys context (64). This is applicable for logging system variables.</td>
 	</tr>
 	<tr>
 		<td>g_apex</td>
-		<td>Logger level apex (128).</td>
+		<td>*Deprecated* Logger level apex (128).</td>
 	</tr>
 </table>
 
@@ -100,15 +102,41 @@ This will still work, however it is recommended that you use the numeric values.
   </tr>
   <tr>
     <td>g_timing_name</td>
-    <td>Logger level name: TIMING</td>
+    <td>*Deprecated* Logger level name: TIMING</td>
   </tr>
   <tr>
     <td>g_sys_context_name</td>
-    <td>Logger level name: SYS_CONTEXT</td>
+    <td>*Deprecated* Logger level name: SYS_CONTEXT</td>
   </tr>
   <tr>
     <td>g_apex_name</td>
-    <td>Logger level name: APEX</td>
+    <td>*Deprecated* Logger level name: APEX</td>
+  </tr>
+</table>
+
+<a name="apex-item-types"></a>
+##APEX Item Types
+`log_apex_items` takes in an optional variable `p_item_scope`. This determines which items to log in APEX. Use the following global variables as valid vaules.
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>g_apex_item_type_all</td>
+    <td>Log both application and page level items</td>
+  </tr>
+  <tr>
+    <td>g_apex_item_type_app</td>
+    <td>Only application level items</td>
+  </tr>
+  <tr>
+    <td>g_apex_item_type_page</td>
+    <td>Only page level items</td>
+  </tr>
+  <tr>
+    <td>&lt;page_number&gt;</td>
+    <td>All page items corresponding to the given page will be logged</td>
   </tr>
 </table>
 
@@ -138,7 +166,7 @@ This will still work, however it is recommended that you use the numeric values.
 		  logger_level (number) </br>
 		  </br>
          See <a href="Plugins.md">Plugins documentation</a> for more information and examples.</td>
-	</tr>	
+	</tr>
 </table>
 
 <a name="subprograms"></a>
@@ -147,6 +175,10 @@ This will still work, however it is recommended that you use the numeric values.
 <a name="main-logger-procedures"></a>
 ##Main Logger Procedures
 Since the main Logger procedures all have the same syntax and behavior (except for the procedure names) the documentation has been combined to avoid replication.
+
+<a name="main-logger-best-practices"></a>
+###Best Practices
+The [Best Practices](Best%20Practices.md#logger-level-guide) guide covers which Logger procedure to use in different circumstances.
 
 <a name="main-logger-syntax"></a>
 ###Syntax
@@ -275,10 +307,11 @@ There are many occasions when the value of one of the USERENV session variables 
 ####Syntax
 
 ```sql
-logger.log_userenv(
-  p_detail_level  in varchar2 default 'USER',-- ALL, NLS, USER, INSTANCE
-  p_show_null     in boolean  default false,
-  p_scope         in varchar2 default null)
+log_userenv(
+  p_detail_level in varchar2 default 'USER',-- ALL, NLS, USER, INSTANCE,
+  p_show_null in boolean default false,
+  p_scope in logger_logs.scope%type default null,
+  p_level in logger_logs.logger_level%type default null);
 ```
 
 ####Parameters
@@ -299,6 +332,10 @@ logger.log_userenv(
   <tr>
     <td>p_scope</td>
     <td>Scope to log variables under.</td>
+  </tr>
+  <tr>
+    <td>p_level</td>
+    <td>Highest level to run at (default logger.g_debug). Example. If you set to logger.g_error it will work when both in DEBUG and ERROR modes. However if set to logger.g_debug (default) will not store values when level is set to ERROR.</td>
   </tr>
 </table>
 
@@ -346,7 +383,8 @@ This option only works within a web session, but it's a great way to quickly tak
 ```sql
 logger.log_cgi_env(
   p_show_null in boolean default false,
-  p_scope in varchar2 default null);
+  p_scope in logger_logs.scope%type default null,
+  p_level in logger_logs.logger_level%type default null);
 ```
 
 ####Parameters
@@ -362,6 +400,10 @@ logger.log_cgi_env(
     <tr>
     <td>p_scope</td>
     <td>Scope to log CGI variables under.</td>
+  </tr>
+  <tr>
+    <td>p_level</td>
+    <td>Highest level to run at (default logger.g_debug). Example. If you set to logger.g_error it will work when both in DEBUG and ERROR modes. However if set to logger.g_debug (default) will not store values when level is set to ERROR.</td>
   </tr>
 </table>
 
@@ -392,9 +434,10 @@ Have you ever run into an issue with a string that contains control characters s
 
 ```sql
 logger.log_character_codes(
-  p_text          in varchar2,
-  p_scope         in varchar2 default null,
-  p_show_common_codes   in boolean default true);
+  p_text in varchar2,
+  p_scope in logger_logs.scope%type default null,
+  p_show_common_codes in boolean default true,
+  p_level in logger_logs.logger_level%type default null);
 ```
 
 ####Parameters
@@ -414,6 +457,10 @@ logger.log_character_codes(
   <tr>
     <td>p_show_common_codes</td>
     <td>Provides legend of common character codes in output.</td>
+  </tr>
+  <tr>
+    <td>p_level</td>
+    <td>Highest level to run at (default logger.g_debug). Example. If you set to logger.g_error it will work when both in DEBUG and ERROR modes. However if set to logger.g_debug (default) will not store values when level is set to ERROR.</td>
   </tr>
 </table>
 
@@ -437,8 +484,11 @@ This feature is useful in debugging issues in an APEX application that are relat
 ####Syntax
 ```sql
 logger.log_apex_items(
-  p_text    in varchar2 default 'Log APEX Items',
-  p_scope   in varchar2 default null);
+  p_text in varchar2 default 'Log APEX Items',
+  p_scope in logger_logs.scope%type default null,
+  p_item_type in varchar2 default logger.g_apex_item_type_all,
+  p_log_null_items in boolean default true,
+  p_level in logger_logs.logger_level%type default null);
 ```
 
 ####Parameters
@@ -451,17 +501,27 @@ logger.log_apex_items(
     <td>p_text</td>
     <td>Text to be added to TEXT column.</td>
   </tr>
-    <tr>
+  <tr>
     <td>p_scope</td>
     <td>Scope to log text under.</td>
+  </tr>
+  <tr>
+    <td>p_item_type</td>
+    <td>Determines what type of APEX items are logged (all, application, page). See the <a href="#apex-item-type">corresponding global variables</a> that it can reference. Alternatively it can reference a page_id which will then only log items on the defined page.</td>
+  </tr>
+  <tr>
+    <td>p_log_null_items</td>
+    <td>If set to false, null values won't be logged.</td>
+  </tr>
+  <tr>
+    <td>p_level</td>
+    <td>Highest level to run at (default logger.g_debug). Example. If you set to logger.g_error it will work when both in DEBUG and ERROR modes. However if set to logger.g_debug (default) will not store values when level is set to ERROR.</td>
   </tr>
 </table>
 
 ####Example
-TODO required configuration
-
 ```sql
--- in an on-submit page process
+-- Include in your APEX code
 begin
   logger.log_apex_items('Debug Edit Customer');
 end;
@@ -566,7 +626,7 @@ PL/SQL procedure successfully completed.
 <a name="procedure-sprintf"></a>
 ###SPRINTF
 
-```sprintf``` is similar to the common procedure [```printf```](http://en.wikipedia.org/wiki/Printf_format_string) found in many programming languages. It replaces substitution strings for a given string. Substitution strings can be either ```%s``` or ```%s<n>``` where ```<n>``` is a number 1~10. 
+```sprintf``` is similar to the common procedure [```printf```](http://en.wikipedia.org/wiki/Printf_format_string) found in many programming languages. It replaces substitution strings for a given string. Substitution strings can be either ```%s``` or ```%s<n>``` where ```<n>``` is a number 1~10.
 
 The following rules are used to handle substitution strings (in order):
 - Replaces ```%s<n>``` with ```p_s<n>```, regardless of order that they appear in ```p_str```
@@ -673,14 +733,16 @@ logger.get_cgi_env(
 TODO
 ```
 
+
 <a name="procedure-get_pref"></a>
 ###GET_PREF
-Returns the preference from LOGGER_PREFS.
+Returns the preference from LOGGER_PREFS. If `p_pref_type` is not defined then the system level preferences will be returned.
 
 ####Syntax
 ```sql
-logger.function get_pref(
-  p_pref_name     in  varchar2)
+logger.get_pref(
+  p_pref_name in logger_prefs.pref_name%type,
+  p_pref_type in logger_prefs.pref_type%type default logger.g_pref_type_logger)
   return varchar2
 ```
 
@@ -694,7 +756,11 @@ logger.function get_pref(
     <td>p_pref_name</td>
     <td>Preference to get value for.</td>
   </tr>
-    <tr>
+  <tr>
+    <td>p_pref_type</td>
+    <td>Preference type</td>
+  </tr>
+  <tr>
     <td>return</td>
     <td>Prefence value.</td>
   </tr>
@@ -702,8 +768,89 @@ logger.function get_pref(
 
 ####Example
 ```sql
-TODO
+dbms_output.put_line('Logger level: ' || logger.get_pref('LEVEL'));
 ```
+
+
+<a name="procedure-set_pref"></a>
+###SET_PREF
+In some cases you may want to store custom preferences in the `LOGGER_PREFS` table. A use case for this would be when creating a plugin that needs to reference some parameters.
+
+This procedure allows you to leverage the `LOGGER_PREFS` table to store your custom preferences. To avoid any naming conflicts with Logger, you must use a type (defined in `p_pref_type`). You can not use the type `LOGGER` as it is reserved for Logger system preferences.
+
+`SET_PREF` will either create or udpate a value. Values must contain data. If not, use [`DEL_PREF`](#procedure-del_pref) to delete unused preferences.
+
+####Syntax
+```sql
+logger.set_pref(
+  p_pref_type in logger_prefs.pref_type%type,
+  p_pref_name in logger_prefs.pref_name%type,
+  p_pref_value in logger_prefs.pref_value%type);
+```
+
+####Parameters
+<table border="0">
+  <tr>
+    <th>Prameter</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>p_pref_type</td>
+    <td>Type of preference. Use your own name space to avoid conflicts with Logger. Types will automatically be converted to uppercase</td>
+  </tr>
+  <tr>
+    <td>p_pref_name</td>
+    <td>Preference to get value for. Must be prefixed with "CUST_". Value will be created or updated. This value will be stored as uppercase.</td>
+  </tr>
+  <tr>
+    <td>p_pref_value</td>
+    <td>Prefence value.</td>
+  </tr>
+</table>
+
+####Example
+```sql
+logger.set_pref(
+  p_pref_type => 'CUSTOM'
+  p_pref_name => 'MY_PREF',
+  p_pref_value => 'some value');
+```
+
+
+<a name="procedure-del_pref"></a>
+###DEL_PREF
+Deletes a preference except for system level preferences.
+
+####Syntax
+```sql
+logger.del_pref(
+  p_pref_type in logger_prefs.pref_type%type,
+  p_pref_name in logger_prefs.pref_name%type);
+```
+
+####Parameters
+<table border="0">
+  <tr>
+    <th>Prameter</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>p_pref_type</td>
+    <td>Namepsace / type of preference.</td>
+  </tr>
+  <tr>
+    <td>p_pref_name</td>
+    <td>Custom preference to delete.</td>
+  </tr>
+</table>
+
+####Example
+```sql
+logger.del_pref(
+  p_pref_type => 'CUSTOM'
+  p_pref_name => 'MY_PREF');
+```
+
 
 <a name="procedure-purge"></a>
 ###PURGE
@@ -953,6 +1100,216 @@ Common Codes: 13=Line Feed, 10=Carriage Return, 32=Space, 9=Tab
 ```
 
 
+<a name="procedure-append_param"></a>
+###APPEND_PARAM
+Logger has wrapper functions to quickly and easily log parameters. All primary log procedures take in a fourth parameter to support logging a parameter array. The values are explicitly converted to strings so you don't need to convert them. The parameter values will be stored n the *extra* column.
+
+####Syntax
+```sql
+logger.append_param(
+  p_params in out nocopy logger.tab_param,
+  p_name in varchar2,
+  p_val in <various_data_types>);
+```
+
+####Parameters
+<table border="0">
+  <tr>
+    <th>Prameter</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>p_params</td>
+    <td>Param array to append parameter value to.</td>
+  </tr>
+    <tr>
+    <td>p_name</td>
+    <td>Name of the parameter.</td>
+  </tr>
+  <tr>
+    <td>p_val</td>
+    <td>Value (in original data type).</td>
+  </tr>
+</table>
+
+####Example
+```sql
+create or replace procedure p_demo_function(
+  p_empno in emp.empno%type,
+  p_ename in emp.ename%type)
+as
+  l_scope logger_logs.scope%type := 'p_demo_function';
+  l_params logger.tab_param;
+begin
+  logger.append_param(l_params, 'p_empno', p_empno); -- Parameter name and value just stored in PL/SQL array and not logged yet
+  logger.append_param(l_params, 'p_ename', p_ename); -- Parameter name and value just stored in PL/SQL array and not logged yet
+  logger.log('START', l_scope, null, l_params); -- All parameters are logged at this point  
+  -- ...
+exception
+  when others then
+    logger.log_error('Unhandled Exception', l_scope, null, l_params);
+end p_demo_function;
+/
+```
+
+<a name="procedure-ok_to_log"></a>
+###OK_TO_LOG
+Though Logger internally handles when a statement is stored in the LOGGER_LOGS table there may be situations where you need to know if logger will log a statement before calling logger. This is useful when doing an expensive operation just to log the data.
+
+A classic example is looping over an array for the sole purpose of logging the data. In this case, there's no reason why the code should perform the additional computations when logging is disabled for a certain level.
+
+*ok\_to\_log* will also factor in client specific logging settings.
+
+*Note*: *ok\_to\_log* is not something that should be used frequently. All calls to logger run this command internally.
+
+####Syntax
+```sql
+logger.ok_to_log(p_level  in  varchar2)
+  return boolean;
+```
+
+####Parameters
+<table border="0">
+  <tr>
+    <th>Prameter</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>p_level</td>
+    <td>Level (name) to test for.</td>
+  </tr>
+    <tr>
+    <td>return</td>
+    <td>Wether or not level will be logged.</td>
+  </tr>
+</table>
+
+####Example
+```sql
+declare
+  type typ_array is table of number index by pls_integer;
+  l_array typ_array;
+begin
+  -- Load test data
+  for x in 1..100 loop
+    l_array(x) := x;
+  end loop;
+
+  -- Only log if logging is enabled
+  if logger.ok_to_log(logger.g_debug) then
+    for x in 1..l_array.count loop
+      logger.log(l_array(x));
+    end loop;
+  end if;
+end;
+/
+```
+
+Note: ok\_to\_log should not be used for one-off log commands. This defeats the whole purpose of having the various log commands. For example ok\_to\_log should *not* be used in the following way:
+
+```sql
+-- Reminder: This is an example of how not to use ok_to_log
+...
+if logger.ok_to_log(logger.g_debug) then
+ logger.log('test');
+end if;
+...
+```
+
+
+<a name="procedure-ins_logger_logs"></a>
+###INS_LOGGER_LOGS
+Similar to ```ok_to_log```, this procedure should be used very infrequently as the main Logger procedures should handle everything that is required for quickly logging information.
+
+As part of the 2.1.0 release, the trigger on ```LOGGER_LOGS``` was removed for both performance and other issues. Though inserting directly to the ```LOGGER_LOGS``` table is not a supported feature of Logger, you may have some code that does a direct insert. The primary reason that a manual insert into ```LOGGER_LOGS``` was done was to obtain the ```ID``` column for the log entry.
+
+To help prevent any issues with backwards compatibility, ```ins_logger_logs```  has been made publicly accessible to handle any inserts into ```LOGGER_LOGS```. This is a supported procedure and any manual insert statements will need to be modified to use this procedure instead.
+
+Important things to now about ```ins_logger_logs```:
+
+ - It does not check the Logger level. This means it will always insert into the ```LOGGER_LOGS``` table. It is also an Autonomous Transaction procedure so a commit is always performed, however it will not affect the current session.
+ - [Plugins](Plugins.md) will not be executed when calling this procedure. If you have critical processes which leverage plugin support you should use the proper log function instead.
+
+####Syntax
+```sql
+logger.ins_logger_logs(
+  p_logger_level in logger_logs.logger_level%type,
+  p_text in varchar2 default null,
+  p_scope in logger_logs.scope%type default null,
+  p_call_stack in logger_logs.call_stack%type default null,
+  p_unit_name in logger_logs.unit_name%type default null,
+  p_line_no in logger_logs.line_no%type default null,
+  p_extra in logger_logs.extra%type default null,
+  po_id out nocopy logger_logs.id%type);
+```
+
+####Parameters
+<table border="0">
+  <tr>
+    <th>Prameter</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>p_logger_level</td>
+    <td>Logger level. See <a href="#constants">Constants</a> section for list of variables to chose from.</td>
+  </tr>
+    <tr>
+    <td>p_text</td>
+    <td>Text column.</td>
+  </tr>
+  <tr>
+    <td>p_scope</td>
+    <td>Scope.</td>
+  </tr>
+  <tr>
+    <td>p_call_stack</td>
+    <td>PL/SQL call stack.</td>
+  </tr>
+  <tr>
+    <td>p_unit_name</td>
+    <td>Unit name (this is usually the calling procedure).</td>
+  </tr>
+  <tr>
+    <td>p_line_no</td>
+    <td>Line number</td>
+  </tr>
+  <tr>
+    <td>p_extra</td>
+    <td>Extra CLOB.</td>
+  </tr>
+  <tr>
+    <td>po_id</td>
+    <td>Logger ID (out).</td>
+  </tr>
+</table>
+
+####Example
+```sql
+set serveroutput on
+
+declare
+  l_id logger_logs.id%type;
+begin
+  -- Note: Commented out parameters not used for this demo (but still accessible via API)
+  logger.ins_logger_logs(
+    p_logger_level => logger.g_debug,
+    p_text => 'Custom Insert',
+    p_scope => 'demo.logger.custom_insert',
+--    p_call_stack => ''
+    p_unit_name => 'Dynamic PL/SQL',
+--    p_line_no => ,
+--    p_extra => ,
+    po_id => l_id
+  );
+
+  dbms_output.put_line('ID: ' || l_id);
+end;
+/
+
+ID: 2930650
+```
+
+
 <a name="set-logging-level"></a>
 ##Set Logging Level
 
@@ -995,7 +1352,7 @@ logger.set_level(
   </tr>
   <tr>
     <td>p_level</td>
-    <td>Use logger.g_&lt;level&gt;_name variables. See [Constants](#constants-logger-levels) </td>
+    <td>Use logger.g_&lt;level&gt;_name variables. See [Constants](#constants-logger-levels). If the level is deprecated it will automatically be set to DEBUG.</td>
   </tr>
     <tr>
     <td>p_client_id</td>
@@ -1319,213 +1676,4 @@ logger.time_stop_seconds(
 ####Example
 ```sql
 TODO
-```
-
-<a name="procedure-append_param"></a>
-###APPEND_PARAM
-Logger has wrapper functions to quickly and easily log parameters. All primary log procedures take in a fourth parameter to support logging a parameter array. The values are explicitly converted to strings so you don't need to convert them. The parameter values will be stored n the *extra* column.
-
-####Syntax
-```sql
-logger.append_param(
-  p_params in out nocopy logger.tab_param,
-  p_name in varchar2,
-  p_val in <various_data_types>);
-```
-
-####Parameters
-<table border="0">
-  <tr>
-    <th>Prameter</th>
-    <th>Description</th>
-  </tr>
-  <tr>
-    <td>p_params</td>
-    <td>Param array to append parameter value to.</td>
-  </tr>
-    <tr>
-    <td>p_name</td>
-    <td>Name of the parameter.</td>
-  </tr>
-  <tr>
-    <td>p_val</td>
-    <td>Value (in original data type).</td>
-  </tr>
-</table>
-
-####Example
-```sql
-create or replace procedure p_demo_function(
-  p_empno in emp.empno%type,
-  p_ename in emp.ename%type)
-as
-  l_scope logger_logs.scope%type := 'p_demo_function';
-  l_params logger.tab_param;
-begin
-  logger.append_param(l_params, 'p_empno', p_empno); -- Parameter name and value just stored in PL/SQL array and not logged yet
-  logger.append_param(l_params, 'p_ename', p_ename); -- Parameter name and value just stored in PL/SQL array and not logged yet
-  logger.log('START', l_scope, null, l_params); -- All parameters are logged at this point  
-  -- ...
-exception
-  when others then
-    logger.log_error('Unhandled Exception', l_scope, null, l_params);
-end p_demo_function;
-/
-```
-
-<a name="procedure-ok_to_log"></a>
-###OK_TO_LOG
-Though Logger internally handles when a statement is stored in the LOGGER_LOGS table there may be situations where you need to know if logger will log a statement before calling logger. This is useful when doing an expensive operation just to log the data.
-
-A classic example is looping over an array for the sole purpose of logging the data. In this case, there's no reason why the code should perform the additional computations when logging is disabled for a certain level.
-
-*ok\_to\_log* will also factor in client specific logging settings.
-
-*Note*: *ok\_to\_log* is not something that should be used frequently. All calls to logger run this command internally.
-
-####Syntax
-```sql
-logger.ok_to_log(p_level  in  varchar2)
-  return boolean;
-```
-
-####Parameters
-<table border="0">
-  <tr>
-    <th>Prameter</th>
-    <th>Description</th>
-  </tr>
-  <tr>
-    <td>p_level</td>
-    <td>Level (name) to test for.</td>
-  </tr>
-    <tr>
-    <td>return</td>
-    <td>Wether or not level will be logged.</td>
-  </tr>
-</table>
-
-####Example
-```sql
-declare
-  type typ_array is table of number index by pls_integer;
-  l_array typ_array;
-begin
-  -- Load test data
-  for x in 1..100 loop
-    l_array(x) := x;
-  end loop;
-
-  -- Only log if logging is enabled
-  if logger.ok_to_log(logger.g_debug) then
-    for x in 1..l_array.count loop
-      logger.log(l_array(x));
-    end loop;
-  end if;
-end;
-/
-```
-
-Note: ok\_to\_log should not be used for one-off log commands. This defeats the whole purpose of having the various log commands. For example ok\_to\_log should *not* be used in the following way:
-
-```sql
--- Reminder: This is an example of how not to use ok_to_log
-...
-if logger.ok_to_log(logger.g_debug) then
- logger.log('test');
-end if;
-...
-```
-
-
-<a name="procedure-ins_logger_logs"></a>
-###INS_LOGGER_LOGS
-Similar to ```ok_to_log```, this procedure should be used very infrequently as the main Logger procedures should handle everything that is required for quickly logging information.
-
-As part of the 2.1.0 release, the trigger on ```LOGGER_LOGS``` was removed for both performance and other issues. Though inserting directly to the ```LOGGER_LOGS``` table is not a supported feature of Logger, you may have some code that does a direct insert. The primary reason that a manual insert into ```LOGGER_LOGS``` was done was to obtain the ```ID``` column for the log entry.
-
-To help prevent any issues with backwards compatibility, ```ins_logger_logs```  has been made publicly accessible to handle any inserts into ```LOGGER_LOGS```. This is a supported procedure and any manual insert statements will need to be modified to use this procedure instead.
-
-Important things to now about ```ins_logger_logs```:
-
- - It does not check the Logger level. This means it will always insert into the ```LOGGER_LOGS``` table. It is also an Autonomous Transaction procedure so a commit is always performed, however it will not affect the current session.
- - [Plugins](Plugins.md) will not be executed when calling this procedure. If you have critical processes which leverage plugin support you should use the proper log function instead.
-
-####Syntax
-```sql
-logger.ins_logger_logs(
-  p_logger_level in logger_logs.logger_level%type,
-  p_text in varchar2 default null,
-  p_scope in logger_logs.scope%type default null,
-  p_call_stack in logger_logs.call_stack%type default null,
-  p_unit_name in logger_logs.unit_name%type default null,
-  p_line_no in logger_logs.line_no%type default null,
-  p_extra in logger_logs.extra%type default null,
-  po_id out nocopy logger_logs.id%type);
-```
-
-####Parameters
-<table border="0">
-  <tr>
-    <th>Prameter</th>
-    <th>Description</th>
-  </tr>
-  <tr>
-    <td>p_logger_level</td>
-    <td>Logger level. See <a href="#constants">Constants</a> section for list of variables to chose from.</td>
-  </tr>
-    <tr>
-    <td>p_text</td>
-    <td>Text column.</td>
-  </tr>
-  <tr>
-    <td>p_scope</td>
-    <td>Scope.</td>
-  </tr>
-  <tr>
-    <td>p_call_stack</td>
-    <td>PL/SQL call stack.</td>
-  </tr>
-  <tr>
-    <td>p_unit_name</td>
-    <td>Unit name (this is usually the calling procedure).</td>
-  </tr>
-  <tr>
-    <td>p_line_no</td>
-    <td>Line number</td>
-  </tr>
-  <tr>
-    <td>p_extra</td>
-    <td>Extra CLOB.</td>
-  </tr>
-  <tr>
-    <td>po_id</td>
-    <td>Logger ID (out).</td>
-  </tr>
-</table>
-
-####Example
-```sql
-set serveroutput on
-
-declare
-  l_id logger_logs.id%type;
-begin
-  -- Note: Commented out parameters not used for this demo (but still accessible via API)
-  logger.ins_logger_logs(
-    p_logger_level => logger.g_debug,
-    p_text => 'Custom Insert',
-    p_scope => 'demo.logger.custom_insert',
---    p_call_stack => ''
-    p_unit_name => 'Dynamic PL/SQL',
---    p_line_no => ,
---    p_extra => ,
-    po_id => l_id
-  );
-
-  dbms_output.put_line('ID: ' || l_id);
-end;
-/
-
-ID: 2930650
 ```

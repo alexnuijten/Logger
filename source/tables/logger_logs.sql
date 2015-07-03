@@ -25,20 +25,20 @@ begin
   if l_count = 0 then
     execute immediate '
 create table logger_logs(
-  id				    number,
-  logger_level	    number,
-  text	            varchar2(4000),
-  time_stamp		    timestamp,
-  scope               varchar2(1000),
-  module			    varchar2(100),
-  action			    varchar2(100),
-  user_name	        varchar2(255),
-  client_identifier   varchar2(255),
-  call_stack		    varchar2(4000),
-  unit_name		    varchar2(255),
-  line_no			    varchar2(100),
-  scn                 number,
-  extra               clob,
+  id number,
+  logger_level number,
+  text varchar2(4000),
+  time_stamp timestamp,
+  scope varchar2(1000),
+  module varchar2(100),
+  action varchar2(100),
+  user_name varchar2(255),
+  client_identifier varchar2(255),
+  call_stack varchar2(4000),
+  unit_name varchar2(255),
+  line_no varchar2(100),
+  scn number,
+  extra clob,
   constraint logger_logs_pk primary key (id) enable,
   constraint logger_logs_lvl_ck check(logger_level in (1,2,4,8,16,32,64,128))
 )
@@ -83,39 +83,44 @@ create table logger_logs(
     where 1=1
       and table_name = 'LOGGER_LOGS'
       and column_name = l_new_cols(i).column_name;
-    
+
     if l_count = 0 then
       execute immediate 'alter table LOGGER_LOGS add (' || l_new_cols(i).column_name || ' ' || l_new_cols(i).data_type || ')';
     end if;
   end loop;
 
 
-  -- SEQUENCE
-  select count(1)
-  into l_count
-  from user_sequences
-  where sequence_name = 'LOGGER_LOGS_SEQ';
+  $if $$logger_no_op_install $then
+    null;
+  $else
+    -- SEQUENCE
+    select count(1)
+    into l_count
+    from user_sequences
+    where sequence_name = 'LOGGER_LOGS_SEQ';
 
-  if l_count = 0 then
-    execute immediate '
-      create sequence logger_logs_seq
-          minvalue 1
-          maxvalue 999999999999999999999999999
-          start with 1
-          increment by 1
-          cache 20
-    ';
-  end if;
+    if l_count = 0 then
+      execute immediate '
+        create sequence logger_logs_seq
+            minvalue 1
+            maxvalue 999999999999999999999999999
+            start with 1
+            increment by 1
+            cache 20
+      ';
+    end if;
 
-  -- INDEXES
-  select count(1)
-  into l_count
-  from user_indexes
-  where index_name = 'LOGGER_LOGS_IDX1';
+    -- INDEXES
+    select count(1)
+    into l_count
+    from user_indexes
+    where index_name = 'LOGGER_LOGS_IDX1';
 
-  if l_count = 0 then
-    execute immediate 'create index logger_logs_idx1 on logger_logs(time_stamp,logger_level)';
-  end if;
+    if l_count = 0 then
+      execute immediate 'create index logger_logs_idx1 on logger_logs(time_stamp,logger_level)';
+    end if;
+  $end
+
 end;
 /
 

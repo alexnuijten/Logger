@@ -80,6 +80,16 @@ as
 
   gc_empty_tab_param tab_param;
 
+  -- #54: Types for log_apex_items
+  g_apex_item_type_all constant varchar2(30) := 'ALL'; -- Application items and page items
+  g_apex_item_type_app constant varchar2(30) := 'APP'; -- All application items
+  g_apex_item_type_page constant varchar2(30) := 'PAGE'; -- All page items
+  -- To log items on a particular page, just enter the page number
+
+  -- #127
+  -- Note to developers: This is only for internal Logger code. Do not use this as part of your code.
+  g_pref_type_logger constant logger_prefs.pref_type%type := 'LOGGER'; -- If this changes need to modify logger_prefs.sql as it has a dependancy.
+
   -- Expose private functions only for testing during development
   $if $$logger_debug $then
     function is_number(p_str in varchar2)
@@ -198,65 +208,69 @@ as
   	return clob;
 
   procedure log_userenv(
-    p_detail_level  in varchar2 default 'USER',-- ALL, NLS, USER, INSTANCE,
-    p_show_null 	in boolean default false,
-    p_scope         in varchar2 default null);
+    p_detail_level in varchar2 default 'USER',-- ALL, NLS, USER, INSTANCE,
+    p_show_null in boolean default false,
+    p_scope in logger_logs.scope%type default null,
+    p_level in logger_logs.logger_level%type default null);
 
   procedure log_cgi_env(
-    p_show_null 	in boolean default false,
-    p_scope         in varchar2 default null);
+    p_show_null in boolean default false,
+    p_scope in logger_logs.scope%type default null,
+    p_level in logger_logs.logger_level%type default null);
 
-	procedure log_character_codes(
-		p_text					in varchar2,
-    p_scope					in varchar2 default null,
-		p_show_common_codes 	in boolean default true);
+  procedure log_character_codes(
+    p_text in varchar2,
+    p_scope in logger_logs.scope%type default null,
+    p_show_common_codes in boolean default true,
+    p_level in logger_logs.logger_level%type default null);
 
-  procedure log_apex_items(
-		p_text		in varchar2 default 'Log APEX Items',
-    p_scope		in varchar2 default null);
+    procedure log_apex_items(
+      p_text in varchar2 default 'Log APEX Items',
+      p_scope in logger_logs.scope%type default null,
+      p_item_type in varchar2 default logger.g_apex_item_type_all,
+      p_log_null_items in boolean default true,
+      p_level in logger_logs.logger_level%type default null);
 
 	procedure time_start(
-		p_unit				in varchar2,
-    p_log_in_table 	    IN boolean default true);
+		p_unit in varchar2,
+    p_log_in_table in boolean default true);
 
 	procedure time_stop(
-		p_unit				IN VARCHAR2,
-    p_scope             in varchar2 default null);
+		p_unit in varchar2,
+    p_scope in varchar2 default null);
 
   function time_stop(
-    p_unit				IN VARCHAR2,
-    p_scope             in varchar2 default null,
-    p_log_in_table 	    IN boolean default true
-    )
+    p_unit in varchar2,
+    p_scope in varchar2 default null,
+    p_log_in_table in boolean default true)
     return varchar2;
 
   function time_stop_seconds(
-    p_unit				in varchar2,
-    p_scope             in varchar2 default null,
-    p_log_in_table 	    in boolean default true
-    )
+    p_unit in varchar2,
+    p_scope in varchar2 default null,
+    p_log_in_table in boolean default true)
     return number;
 
   procedure time_reset;
 
-	function get_pref(
-		p_pref_name			in	varchar2)
+  function get_pref(
+    p_pref_name in logger_prefs.pref_name%type,
+    p_pref_type in logger_prefs.pref_type%type default logger.g_pref_type_logger)
     return varchar2
-    $IF not dbms_db_version.ver_le_10_2 $THEN
+    $if not dbms_db_version.ver_le_10_2  $then
       result_cache
-    $END
-    ;
+    $end;
 
-   -- #103
-   procedure set_cust_pref (
-      p_pref_name in logger_prefs.pref_name%type,
-      p_pref_value in logger_prefs.pref_value%type
-   );
+  -- #103
+  procedure set_pref(
+    p_pref_type in logger_prefs.pref_type%type,
+    p_pref_name in logger_prefs.pref_name%type,
+    p_pref_value in logger_prefs.pref_value%type);
 
-   -- #103
-   procedure del_cust_pref (
-      p_pref_name in logger_prefs.pref_name%type
-   );
+  -- #103
+  procedure del_pref(
+    p_pref_type in logger_prefs.pref_type%type,
+    p_pref_name in logger_prefs.pref_name%type);
 
 	procedure purge(
 		p_purge_after_days in varchar2 default null,
