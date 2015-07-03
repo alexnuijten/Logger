@@ -40,6 +40,9 @@ as
 
 
   -- VARIABLES
+  -- #129
+  -- Don't change the version number. Build script will
+  -- set the right version number
   g_major_version constant pls_integer := -91;
   g_minor_version constant pls_integer := -92;
   g_patch_version constant pls_integer := -93;

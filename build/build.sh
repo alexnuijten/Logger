@@ -170,7 +170,7 @@ sed -i.del "s/x\.x\.x/$VERSION_NUMBER/g" $RELEASE_FOLDER/logger_install.sql
 
 # Orginial:
 # sed -i.del "s/x\.x\.x/$VERSION_NUMBER/g" $RELEASE_FOLDER/logger.pks
-#Change the version number to the individual components
+# #129: Change the version number to the individual components
 echo $VERSION_NUMBER | while IFS=. read major minor patch beta
 do
    #Replace major version
