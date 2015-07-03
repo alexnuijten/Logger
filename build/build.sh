@@ -167,7 +167,22 @@ chmod 777 $RELEASE_FOLDER/*.*
 
 #Replace any references for the version number
 sed -i.del "s/x\.x\.x/$VERSION_NUMBER/g" $RELEASE_FOLDER/logger_install.sql
-sed -i.del "s/x\.x\.x/$VERSION_NUMBER/g" $RELEASE_FOLDER/logger.pks
+
+# Orginial:
+# sed -i.del "s/x\.x\.x/$VERSION_NUMBER/g" $RELEASE_FOLDER/logger.pks
+#Change the version number to the individual components
+echo $VERSION_NUMBER | while IFS=. read major minor patch beta
+do
+   #Replace major version
+   sed -i.del "s/-91/$major/g" $RELEASE_FOLDER/logger.pks
+   #Replace minor version
+   sed -i.del "s/-92/$minor/g" $RELEASE_FOLDER/logger.pks
+   #Replace patch version
+   sed -i.del "s/-93/$patch/g" $RELEASE_FOLDER/logger.pks
+   #Replace #beta# version
+   sed -i.del "s/#beta#/$beta/g" $RELEASE_FOLDER/logger.pks
+done
+
 #need to remove the backup file required for sed call
 rm -rf $RELEASE_FOLDER/*.del
 

@@ -40,8 +40,19 @@ as
 
 
   -- VARIABLES
-	g_logger_version constant varchar2(10) := 'x.x.x'; -- Don't change this. Build script will replace with right version number
-	g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
+  g_major_version constant pls_integer := -91;
+  g_minor_version constant pls_integer := -92;
+  g_patch_version constant pls_integer := -93;
+  g_beta_version constant varchar2(10) := '#beta#';
+  g_logger_version constant varchar2(20) :=
+     g_major_version||'.'||
+     g_minor_version||'.'||
+     g_patch_version||
+     case when g_beta_version is not null
+     then '_'||g_beta_version
+     end;
+  -- g_logger_version constant varchar2(10) := 'x.x.x'; -- Don't change this. Build script will replace with right version number
+  g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
 
   g_off constant number := 0;
   g_permanent constant number := 1;
