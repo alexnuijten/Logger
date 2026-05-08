@@ -25,6 +25,49 @@ create table logger_prefs(
 
 end;
 /
+-- #127: Add pref_type
+declare
+  type typ_tab_col is record (
+    column_name varchar2(30),
+    data_type varchar2(100),
+    default_val varchar2(100));
+  type typ_arr_tab_col is table of typ_tab_col index by pls_integer;
+
+  l_count pls_integer;
+  l_new_col typ_tab_col;
+  l_new_cols typ_arr_tab_col;
+begin
+
+  l_new_col.column_name := 'PREF_TYPE';
+  l_new_col.data_type := 'VARCHAR2(30)';
+  l_new_col.default_val := 'LOGGER';
+  l_new_cols(l_new_cols.count+1) := l_new_col;
+
+  for i in 1 .. l_new_cols.count loop
+    select count(1)
+    into l_count
+    from user_tab_columns
+    where 1=1
+      and upper(table_name) = upper('logger_prefs')
+      and column_name = l_new_cols(i).column_name;
+
+    if l_count = 0 then
+      execute immediate 'alter table logger_prefs add (' || l_new_cols(i).column_name || ' ' || l_new_cols(i).data_type || nvl2(l_new_cols (i).default_val, ' default '''||l_new_cols(i).default_val||'''', null)|| ')' ;
+
+      -- Custom post-add columns
+
+      -- #127
+      if lower(l_new_cols(i).column_name) = 'pref_type' then
+        -- If "LOGGER" is changed then modify logger.pks g_logger_prefs_pref_type value
+        execute immediate q'!update logger_prefs set pref_type = 'LOGGER'!';
+        execute immediate q'!alter table logger_prefs modify pref_type not null!';
+      end if;
+
+    end if; -- l_count = 0
+  end loop;
+
+end;
+/
 
 
 -- Append existing PLSQL_CCFLAGS
@@ -65,7 +108,7 @@ begin
     :new.pref_type := upper(:new.pref_type);
 
     if 1=1
-      and :new.pref_type = logger.g_pref_type_logger
+      and :new.pref_type = 'LOGGER' -- logger.g_pref_type_logger
       and :new.pref_name = 'LEVEL' then
       :new.pref_value := upper(:new.pref_value);
     end if;
@@ -159,48 +202,6 @@ end;
 
 
 
-
--- #127: Add pref_type
-declare
-  type typ_tab_col is record (
-    column_name varchar2(30),
-    data_type varchar2(100));
-  type typ_arr_tab_col is table of typ_tab_col index by pls_integer;
-
-  l_count pls_integer;
-  l_new_col typ_tab_col;
-  l_new_cols typ_arr_tab_col;
-begin
-
-  l_new_col.column_name := 'PREF_TYPE';
-  l_new_col.data_type := 'VARCHAR2(30)';
-  l_new_cols(l_new_cols.count+1) := l_new_col;
-
-  for i in 1 .. l_new_cols.count loop
-    select count(1)
-    into l_count
-    from user_tab_columns
-    where 1=1
-      and upper(table_name) = upper('logger_prefs')
-      and column_name = l_new_cols(i).column_name;
-
-    if l_count = 0 then
-      execute immediate 'alter table logger_prefs add (' || l_new_cols(i).column_name || ' ' || l_new_cols(i).data_type || ')';
-
-      -- Custom post-add columns
-
-      -- #127
-      if lower(l_new_cols(i).column_name) = 'pref_type' then
-        -- If "LOGGER" is changed then modify logger.pks g_logger_prefs_pref_type value
-        execute immediate q'!update logger_prefs set pref_type = 'LOGGER'!';
-        execute immediate q'!alter table logger_prefs modify pref_type not null!';
-      end if;
-
-    end if; -- l_count = 0
-  end loop;
-
-end;
-/
 
 
 -- #127 If old PK, then drop it

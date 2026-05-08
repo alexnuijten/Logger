@@ -7,3 +7,4 @@ releases/*
 !releases/*.zip
 #For developers
 temp/*
+.fetch-client/
