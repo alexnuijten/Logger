@@ -35,7 +35,8 @@ echo "Building release $VERSION_NUMBER"
 #Generate no_op code
 START_DIR="$PWD"
 cd ../source/packages
-sqlplus $SQL_CONNECTION @../gen_no_op.sql
+# sqlplus $SQL_CONNECTION @../gen_no_op.sql
+sql -name $SQL_CONNECTION @../gen_no_op.sql
 cd $START_DIR
 
 

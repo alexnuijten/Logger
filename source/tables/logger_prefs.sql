@@ -194,8 +194,8 @@ begin
           else p.pref_value
         end
     when not matched then
-      insert (p.pref_name,p.pref_value)
-      values (d.pref_name,d.pref_value);
+      insert (p.pref_name,p.pref_value, pref_type)
+      values (d.pref_name,d.pref_value, logger.g_pref_type_logger);
   $end
 end;
 /

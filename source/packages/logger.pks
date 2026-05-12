@@ -395,5 +395,16 @@ as
   function get_plugin_rec(
     p_logger_level in logger_logs.logger_level%type)
     return logger.rec_logger_log;
+
+   --==
+   -- Log the contents of an APEX Collection for a given collection name
+   -- Only attributes that are filled in will be written to LOGGER_LOGS
+   -- Attributes that are not logged are:
+   --    CLOB001
+   --    BLOB001
+   --    XMLTYPE001
+   procedure log_collection (p_collection_name in varchar2
+                            ,p_scope           in varchar2 default null
+                            );
 end logger;
 /

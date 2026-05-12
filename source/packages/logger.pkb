@@ -2952,5 +2952,93 @@ as
     end if;
   end get_plugin_rec;
 
+  --==
+     --==
+   procedure log_collection (p_collection_name in varchar2
+                            ,p_scope           in varchar2 default null
+                            )
+   is
+      l_clob clob;
+   begin
+      l_clob := '*** Collection '||p_collection_name||' ***'||gc_line_feed;
+      for r in (select seq_id,c001,c002,c003,c004,c005,c006,c007
+                     ,c008,c009,c010,c011,c012,c013,c014,c015,c016,c017,c018,c019,c020,c021
+                     ,c022,c023,c024,c025,c026,c027,c028,c029,c030,c031,c032,c033,c034,c035
+                     ,c036,c037,c038,c039,c040,c041,c042,c043,c044,c045,c046,c047,c048,c049
+                     ,c050,n001,n002,n003,n004,n005,d001,d002,d003,d004,d005
+                  from apex_collections
+               where collection_name = p_collection_name
+               )
+      loop
+         l_clob := l_clob ||'seq_id: '||to_char (r.seq_id)||gc_line_feed;
+         if r.c001 is not null then l_clob := l_clob ||'c001  : '||r.c001||gc_line_feed; end if;
+         if r.c002 is not null then l_clob := l_clob ||'c002  : '||r.c002||gc_line_feed; end if;
+         if r.c003 is not null then l_clob := l_clob ||'c003  : '||r.c003||gc_line_feed; end if;
+         if r.c004 is not null then l_clob := l_clob ||'c004  : '||r.c004||gc_line_feed; end if;
+         if r.c005 is not null then l_clob := l_clob ||'c005  : '||r.c005||gc_line_feed; end if;
+         if r.c006 is not null then l_clob := l_clob ||'c006  : '||r.c006||gc_line_feed; end if;
+         if r.c007 is not null then l_clob := l_clob ||'c007  : '||r.c007||gc_line_feed; end if;
+         if r.c008 is not null then l_clob := l_clob ||'c008  : '||r.c008||gc_line_feed; end if;
+         if r.c009 is not null then l_clob := l_clob ||'c009  : '||r.c009||gc_line_feed; end if;
+         if r.c010 is not null then l_clob := l_clob ||'c010  : '||r.c010||gc_line_feed; end if;
+         if r.c011 is not null then l_clob := l_clob ||'c011  : '||r.c011||gc_line_feed; end if;
+         if r.c012 is not null then l_clob := l_clob ||'c012  : '||r.c012||gc_line_feed; end if;
+         if r.c013 is not null then l_clob := l_clob ||'c013  : '||r.c013||gc_line_feed; end if;
+         if r.c014 is not null then l_clob := l_clob ||'c014  : '||r.c014||gc_line_feed; end if;
+         if r.c015 is not null then l_clob := l_clob ||'c015  : '||r.c015||gc_line_feed; end if;
+         if r.c016 is not null then l_clob := l_clob ||'c016  : '||r.c016||gc_line_feed; end if;
+         if r.c017 is not null then l_clob := l_clob ||'c017  : '||r.c017||gc_line_feed; end if;
+         if r.c018 is not null then l_clob := l_clob ||'c018  : '||r.c018||gc_line_feed; end if;
+         if r.c019 is not null then l_clob := l_clob ||'c019  : '||r.c019||gc_line_feed; end if;
+         if r.c020 is not null then l_clob := l_clob ||'c020  : '||r.c020||gc_line_feed; end if;
+         if r.c021 is not null then l_clob := l_clob ||'c021  : '||r.c021||gc_line_feed; end if;
+         if r.c022 is not null then l_clob := l_clob ||'c022  : '||r.c022||gc_line_feed; end if;
+         if r.c023 is not null then l_clob := l_clob ||'c023  : '||r.c023||gc_line_feed; end if;
+         if r.c024 is not null then l_clob := l_clob ||'c024  : '||r.c024||gc_line_feed; end if;
+         if r.c025 is not null then l_clob := l_clob ||'c025  : '||r.c025||gc_line_feed; end if;
+         if r.c026 is not null then l_clob := l_clob ||'c026  : '||r.c026||gc_line_feed; end if;
+         if r.c027 is not null then l_clob := l_clob ||'c027  : '||r.c027||gc_line_feed; end if;
+         if r.c028 is not null then l_clob := l_clob ||'c028  : '||r.c028||gc_line_feed; end if;
+         if r.c029 is not null then l_clob := l_clob ||'c029  : '||r.c029||gc_line_feed; end if;
+         if r.c030 is not null then l_clob := l_clob ||'c030  : '||r.c030||gc_line_feed; end if;
+         if r.c031 is not null then l_clob := l_clob ||'c031  : '||r.c031||gc_line_feed; end if;
+         if r.c032 is not null then l_clob := l_clob ||'c032  : '||r.c032||gc_line_feed; end if;
+         if r.c033 is not null then l_clob := l_clob ||'c033  : '||r.c033||gc_line_feed; end if;
+         if r.c034 is not null then l_clob := l_clob ||'c034  : '||r.c034||gc_line_feed; end if;
+         if r.c035 is not null then l_clob := l_clob ||'c035  : '||r.c035||gc_line_feed; end if;
+         if r.c036 is not null then l_clob := l_clob ||'c036  : '||r.c036||gc_line_feed; end if;
+         if r.c037 is not null then l_clob := l_clob ||'c037  : '||r.c037||gc_line_feed; end if;
+         if r.c038 is not null then l_clob := l_clob ||'c038  : '||r.c038||gc_line_feed; end if;
+         if r.c039 is not null then l_clob := l_clob ||'c039  : '||r.c039||gc_line_feed; end if;
+         if r.c040 is not null then l_clob := l_clob ||'c040  : '||r.c040||gc_line_feed; end if;
+         if r.c041 is not null then l_clob := l_clob ||'c041  : '||r.c041||gc_line_feed; end if;
+         if r.c042 is not null then l_clob := l_clob ||'c042  : '||r.c042||gc_line_feed; end if;
+         if r.c043 is not null then l_clob := l_clob ||'c043  : '||r.c043||gc_line_feed; end if;
+         if r.c044 is not null then l_clob := l_clob ||'c044  : '||r.c044||gc_line_feed; end if;
+         if r.c045 is not null then l_clob := l_clob ||'c045  : '||r.c045||gc_line_feed; end if;
+         if r.c046 is not null then l_clob := l_clob ||'c046  : '||r.c046||gc_line_feed; end if;
+         if r.c047 is not null then l_clob := l_clob ||'c047  : '||r.c047||gc_line_feed; end if;
+         if r.c048 is not null then l_clob := l_clob ||'c048  : '||r.c048||gc_line_feed; end if;
+         if r.c049 is not null then l_clob := l_clob ||'c049  : '||r.c049||gc_line_feed; end if;
+         if r.c050 is not null then l_clob := l_clob ||'c050  : '||r.c050||gc_line_feed; end if;
+         if r.n001 is not null then l_clob := l_clob ||'n001  : '||to_char (r.n001)||gc_line_feed; end if;
+         if r.n002 is not null then l_clob := l_clob ||'n002  : '||to_char (r.n002)||gc_line_feed; end if;
+         if r.n003 is not null then l_clob := l_clob ||'n003  : '||to_char (r.n003)||gc_line_feed; end if;
+         if r.n004 is not null then l_clob := l_clob ||'n004  : '||to_char (r.n004)||gc_line_feed; end if;
+         if r.n005 is not null then l_clob := l_clob ||'n005  : '||to_char (r.n005)||gc_line_feed; end if;
+         if r.d001 is not null then l_clob := l_clob ||'d001  : '||to_char (r.d001, gc_date_format)||gc_line_feed; end if;
+         if r.d002 is not null then l_clob := l_clob ||'d002  : '||to_char (r.d002, gc_date_format)||gc_line_feed; end if;
+         if r.d003 is not null then l_clob := l_clob ||'d003  : '||to_char (r.d003, gc_date_format)||gc_line_feed; end if;
+         if r.d004 is not null then l_clob := l_clob ||'d004  : '||to_char (r.d004, gc_date_format)||gc_line_feed; end if;
+         if r.d005 is not null then l_clob := l_clob ||'d005  : '||to_char (r.d005, gc_date_format)||gc_line_feed; end if;
+         l_clob := l_clob||'---------------------'||gc_line_feed;
+      end loop;
+      logger.log_information (p_text  => 'APEX Collection ('||p_collection_name||') in Extra'
+                             ,p_scope => p_scope
+                             ,p_extra => l_clob
+                             );
+   end log_collection;
+
+
 end logger;
 /
