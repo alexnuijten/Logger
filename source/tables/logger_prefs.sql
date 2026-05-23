@@ -173,7 +173,7 @@ begin
     merge into logger_prefs p
     using (
       select 'PURGE_AFTER_DAYS' pref_name, '7' pref_value from dual union
-      select 'PURGE_MIN_LEVEL' pref_name, 'DEBUG' pref_value from dual union
+      select 'PURGE_MIN_LEVEL' pref_name, 'INFORMATION' pref_value from dual union
       select 'LOGGER_VERSION' pref_name, 'x.x.x' pref_value from dual union -- x.x.x will be replaced when running the build script
       select 'LEVEL' pref_name, 'DEBUG' pref_value from dual union
       select 'PROTECT_ADMIN_PROCS' pref_name, 'TRUE' pref_value from dual union
