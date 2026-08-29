@@ -16,6 +16,7 @@ is
   l_dummy number;
   l_flashback varchar2(50) := 'FALSE';
   l_utl_lms varchar2(5) := 'FALSE';
+  l_utl_call_stack_available varchar2(50) := 'FALSE';
 
   pragma exception_init(tbl_not_exist, -942);
   pragma exception_init(pls_pkg_not_exist, -06550);
@@ -87,6 +88,24 @@ begin
   end;
 
   l_variables := l_variables||'FLASHBACK_ENABLED:'||l_flashback||',';
+
+
+  -- Is UTL_CALL_STACK available (12.1+) ?
+  --
+  if l_version >= 12.1 then
+    l_utl_call_stack_available := 'TRUE';
+  end if;
+
+  if l_utl_call_stack_available = 'TRUE' then
+    begin
+      execute immediate 'begin :d := utl_call_stack.dynamic_depth; end;' using out l_dummy;
+    exception
+      when others then
+        l_utl_call_stack_available := 'FALSE';
+    end;
+  end if;
+
+  l_variables := l_variables||'UTL_CALL_STACK_AVAILABLE:'||l_utl_call_stack_available||',';
 
 
   -- #64: Support to run Logger in debug mode

@@ -75,6 +75,19 @@ create table logger_logs(
   l_new_col.data_type := 'VARCHAR2(64)'; -- taken from v$session.client_info
   l_new_cols(l_new_cols.count+1) := l_new_col;
 
+  -- Call hierarchy correlation
+  l_new_col.column_name := 'CALL_ID';
+  l_new_col.data_type := 'VARCHAR2(32)'; -- rawtohex(sys_guid())
+  l_new_cols(l_new_cols.count+1) := l_new_col;
+
+  l_new_col.column_name := 'CALL_DEPTH';
+  l_new_col.data_type := 'NUMBER';
+  l_new_cols(l_new_cols.count+1) := l_new_col;
+
+  l_new_col.column_name := 'ROOT_UNIT_NAME';
+  l_new_col.data_type := 'VARCHAR2(255)';
+  l_new_cols(l_new_cols.count+1) := l_new_col;
+
 
   for i in 1 .. l_new_cols.count loop
     select count(1)
@@ -118,6 +131,15 @@ create table logger_logs(
 
     if l_count = 0 then
       execute immediate 'create index logger_logs_idx1 on logger_logs(time_stamp,logger_level)';
+    end if;
+
+    select count(1)
+    into l_count
+    from user_indexes
+    where index_name = 'LOGGER_LOGS_IDX2';
+
+    if l_count = 0 then
+      execute immediate 'create index logger_logs_idx2 on logger_logs(call_id)';
     end if;
   $end
 

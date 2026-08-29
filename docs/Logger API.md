@@ -208,7 +208,11 @@ All of the main Logger procedures have the same parameters
 	</tr>
 	<tr>
 		<td>p_scope</td>
-		<td>p_scope is optional but highly recommend. The idea behind scope is to give some context to the log message, such as the application, package.procedure where it was called from. Logger captures the call stack, as well as module and action which are great for APEX logging as they are app number / page number. However, none of these options gives you a clean, consistent way to group messages. The p_scope parameter performs a lower() on the input and stores it in the SCOPE column.</td>
+		<td>p_scope is optional but highly recommend. The idea behind scope is to give some context to the log message, such as the application, package.procedure where it was called from. Logger captures the call stack, as well as module and action which are great for APEX logging as they are app number / page number. However, none of these options on their own gives you a clean, consistent way to group messages - see the CALL_ID column below for automatic grouping. The p_scope parameter performs a lower() on the input and stores it in the SCOPE column.</td>
+	</tr>
+	<tr>
+		<td>(automatic) CALL_ID / CALL_DEPTH / ROOT_UNIT_NAME</td>
+		<td>Not a parameter - these three LOGGER_LOGS columns are populated automatically (whenever the call stack is captured, i.e. when INCLUDE_CALL_STACK is enabled, or always for log_error) and require no code changes. CALL_DEPTH is the nesting depth of real (non-Logger) PL/SQL frames at the time of logging: 1 means Logger was called directly from top-level entry code, a higher number means it was called from inside nested procedure(s). ROOT_UNIT_NAME is the outermost unit in the current call stack, i.e. where the process actually started. CALL_ID is a correlation id (a generated GUID) that resets whenever a log call happens at CALL_DEPTH = 1 and is inherited by every nested log call beneath it, so <code>where call_id = '...'</code> reconstructs every log row belonging to one logical operation, ordered by nesting depth.</td>
 	</tr>
 	<tr>
 		<td>p_extra</td>
@@ -1240,7 +1244,10 @@ logger.ins_logger_logs(
   p_unit_name in logger_logs.unit_name%type default null,
   p_line_no in logger_logs.line_no%type default null,
   p_extra in logger_logs.extra%type default null,
-  po_id out nocopy logger_logs.id%type);
+  po_id out nocopy logger_logs.id%type,
+  p_call_id in logger_logs.call_id%type default null,
+  p_call_depth in logger_logs.call_depth%type default null,
+  p_root_unit_name in logger_logs.root_unit_name%type default null);
 ```
 
 ####Parameters
@@ -1280,6 +1287,18 @@ logger.ins_logger_logs(
   <tr>
     <td>po_id</td>
     <td>Logger ID (out).</td>
+  </tr>
+  <tr>
+    <td>p_call_id</td>
+    <td>Call correlation id shared by every log row belonging to the same logical call chain. Automatically derived by the built-in log procedures; defaults to null for direct callers.</td>
+  </tr>
+  <tr>
+    <td>p_call_depth</td>
+    <td>Nesting depth of real (non-Logger) PL/SQL frames at the time of logging. Automatically derived by the built-in log procedures; defaults to null for direct callers.</td>
+  </tr>
+  <tr>
+    <td>p_root_unit_name</td>
+    <td>The outermost unit in the current call stack, i.e. where the process actually started. Automatically derived by the built-in log procedures; defaults to null for direct callers.</td>
   </tr>
 </table>
 

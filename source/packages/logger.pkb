@@ -28,6 +28,11 @@ as
   --  Introduced with #46
   --  $$LOGGER_PLUGIN_ERROR
   --
+  -- $$UTL_CALL_STACK_AVAILABLE
+  --  Set in logger_configure.
+  --  True if utl_call_stack (12.1+) can be used for call hierarchy parsing;
+  --  otherwise falls back to text-parsing of dbms_utility.format_call_stack.
+  --
 
 
   -- TYPES
@@ -36,6 +41,7 @@ as
 
   -- VARIABLES
   g_log_id number;
+  g_call_id logger_logs.call_id%type;
   g_proc_start_times ts_array;
   g_running_timers pls_integer := 0;
 
@@ -58,6 +64,7 @@ as
 
   gc_ctx_attr_level constant varchar2(5) := 'level';
   gc_ctx_attr_include_call_stack constant varchar2(18) := 'include_call_stack';
+  gc_anonymous_block_label constant varchar2(20) := 'ANONYMOUS BLOCK';
 
   -- #46 Plugin context names
   gc_ctx_plugin_fn_log constant varchar2(30) := 'plugin_fn_log';
@@ -572,38 +579,161 @@ as
 
 
   /**
-   * Parses the callstack to get unit and line number
+   * Parses the current call hierarchy to determine the immediate caller
+   * (unit/line), the nesting depth of real (non-Logger) frames, the
+   * outermost/root unit where the current process started, and a
+   * correlation id (call_id) shared by every log call within one logical
+   * top-level invocation.
+   *
+   * Skips a contiguous prefix of Logger's own frames (LOGGER/LOGGER_NO_OP)
+   * by identity rather than a fixed offset, since the number of Logger-owned
+   * frames at the top of the stack varies (e.g. 1 when log_information is
+   * called directly, 2 when called via the log_info short-alias wrapper).
    *
    * Notes:
    *  - Private
    *
-   * Related Tickets:
-   *  -
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_callstack
-   * @param o_unit
-   * @param o_lineno
+   * @param p_callstack pre-captured dbms_utility.format_call_stack text;
+   *   only used by the pre-12c fallback branch (the utl_call_stack branch
+   *   reads the live stack directly).
+   * @param o_unit_name
+   * @param o_line_no
+   * @param o_call_depth
+   * @param o_root_unit_name
+   * @param o_call_id
    */
-  procedure get_debug_info(
-    p_callstack in clob,
-    o_unit out varchar2,
-    o_lineno out varchar2 )
+  procedure get_call_hierarchy(
+    p_callstack in varchar2 default null,
+    o_unit_name out varchar2,
+    o_line_no out varchar2,
+    o_call_depth out number,
+    o_root_unit_name out varchar2,
+    o_call_id out varchar2 )
   as
-    --
-    l_callstack varchar2(10000) := p_callstack;
+    $if $$utl_call_stack_available $then
+      l_depth pls_integer;
+      l_i pls_integer;
+      l_owner varchar2(128);
+      l_subprogram utl_call_stack.unit_qualified_name;
+      l_root_owner varchar2(128);
+      l_root_subprogram utl_call_stack.unit_qualified_name;
+    $end
   begin
     $if $$no_op $then
       null;
     $else
-      l_callstack := substr( l_callstack, instr( l_callstack, chr(10), 1, 5 )+1 );
-      l_callstack := substr( l_callstack, 1, instr( l_callstack, chr(10), 1, 1 )-1 );
-      l_callstack := trim( substr( l_callstack, instr( l_callstack, ' ' ) ) );
-      o_lineno := substr( l_callstack, 1, instr( l_callstack, ' ' )-1 );
-      o_unit := trim(substr( l_callstack, instr( l_callstack, ' ', -1, 1 ) ));
+
+      $if $$utl_call_stack_available $then
+        begin
+          l_depth := utl_call_stack.dynamic_depth;
+          l_i := 1;
+
+          while l_i <= l_depth loop
+            l_owner := utl_call_stack.owner(l_i);
+            l_subprogram := utl_call_stack.subprogram(l_i);
+
+            exit when l_owner is null
+              or l_subprogram.count = 0
+              or upper(l_owner) != upper($$plsql_unit_owner)
+              or upper(l_subprogram(1)) not in ('LOGGER','LOGGER_NO_OP');
+
+            l_i := l_i + 1;
+          end loop;
+
+          if l_i <= l_depth then
+            o_unit_name  := l_owner || '.' || utl_call_stack.concatenate_subprogram(l_subprogram);
+            o_line_no    := to_char(utl_call_stack.unit_line(l_i));
+            o_call_depth := l_depth - l_i + 1;
+          end if;
+
+          l_root_owner := utl_call_stack.owner(l_depth);
+          if l_root_owner is null then
+            o_root_unit_name := gc_anonymous_block_label;
+          else
+            l_root_subprogram := utl_call_stack.subprogram(l_depth);
+            o_root_unit_name := l_root_owner || '.' || utl_call_stack.concatenate_subprogram(l_root_subprogram);
+          end if;
+        exception
+          when others then
+            o_unit_name := null;
+            o_line_no := null;
+            o_call_depth := null;
+            o_root_unit_name := null;
+        end;
+      $else
+        declare
+          l_stack        varchar2(10000) := p_callstack;
+          l_line         varchar2(4000);
+          l_pos          pls_integer;
+          l_frame_name   varchar2(500);
+          l_frame_lineno varchar2(100);
+          l_trailing     varchar2(500);
+          l_is_logger    boolean;
+          l_skipping     boolean := true;
+          l_found_real   boolean := false;
+        begin
+          while l_stack is not null loop
+            l_pos := instr(l_stack, gc_line_feed);
+
+            if l_pos = 0 then
+              l_line := l_stack;
+              l_stack := null;
+            else
+              l_line := substr(l_stack, 1, l_pos - 1);
+              l_stack := substr(l_stack, l_pos + 1);
+            end if;
+
+            if regexp_like(l_line, '^\S+\s+\d+\s+\S') then
+              l_frame_lineno := regexp_replace(l_line, '^\S+\s+(\d+)\s+.*$', '\1');
+              l_frame_name   := trim(regexp_replace(l_line, '^\S+\s+\d+\s+(.*)$', '\1'));
+              l_trailing     := trim(substr(l_frame_name, instr(l_frame_name, ' ', -1, 1)));
+
+              l_is_logger := upper(l_trailing) in (
+                'LOGGER', 'LOGGER_NO_OP',
+                upper($$plsql_unit_owner) || '.LOGGER',
+                upper($$plsql_unit_owner) || '.LOGGER_NO_OP');
+
+              if l_skipping and l_is_logger then
+                null; -- still inside Logger's own frames, keep skipping
+              else
+                l_skipping := false;
+                o_call_depth := nvl(o_call_depth, 0) + 1;
+
+                if not l_found_real then
+                  o_unit_name  := l_trailing;
+                  o_line_no    := l_frame_lineno;
+                  l_found_real := true;
+                end if;
+
+                if instr(l_frame_name, 'anonymous block') > 0 then
+                  o_root_unit_name := gc_anonymous_block_label;
+                else
+                  o_root_unit_name := l_trailing;
+                end if;
+              end if;
+            end if;
+          end loop;
+        exception
+          when others then
+            o_unit_name := null;
+            o_line_no := null;
+            o_call_depth := null;
+            o_root_unit_name := null;
+        end;
+      $end
+
+      -- Correlation id: a fresh id starts at every direct (depth = 1) call
+      -- and is inherited by nested calls beneath it. Seed a value if the
+      -- session's first log call happens to be nested.
+      if o_call_depth = 1 then
+        g_call_id := rawtohex(sys_guid());
+      elsif g_call_id is null then
+        g_call_id := rawtohex(sys_guid());
+      end if;
+      o_call_id := g_call_id;
+
     $end
-  end get_debug_info;
+  end get_call_hierarchy;
 
 
   /**
@@ -636,6 +766,9 @@ as
     l_text varchar2(32767);
     l_callstack varchar2(3000);
     l_extra logger_logs.extra%type;
+    l_call_depth logger_logs.call_depth%type;
+    l_root_unit logger_logs.root_unit_name%type;
+    l_call_id logger_logs.call_id%type;
   begin
     $if $$no_op $then
       null;
@@ -644,10 +777,13 @@ as
 
       -- Generate callstack text
       if p_callstack is not null and logger.include_call_stack then
-        logger.get_debug_info(
+        logger.get_call_hierarchy(
           p_callstack => p_callstack,
-          o_unit => l_proc_name,
-          o_lineno => l_lineno);
+          o_unit_name => l_proc_name,
+          o_line_no => l_lineno,
+          o_call_depth => l_call_depth,
+          o_root_unit_name => l_root_unit,
+          o_call_id => l_call_id);
 
         l_callstack  := regexp_replace(p_callstack,'^.*$','',1,4,'m');
         l_callstack  := regexp_replace(l_callstack,'^.*$','',1,1,'m');
@@ -665,7 +801,10 @@ as
         p_text =>l_text,
         p_call_stack  =>l_callstack,
         p_line_no => l_lineno,
-        po_id => g_log_id);
+        po_id => g_log_id,
+        p_call_id => l_call_id,
+        p_call_depth => l_call_depth,
+        p_root_unit_name => l_root_unit);
     $end
   end log_internal;
 
@@ -1178,15 +1317,21 @@ as
     l_text varchar2(32767);
     l_call_stack varchar2(4000);
     l_extra clob;
+    l_call_depth logger_logs.call_depth%type;
+    l_root_unit logger_logs.root_unit_name%type;
+    l_call_id logger_logs.call_id%type;
   begin
     $if $$no_op $then
       null;
     $else
       if ok_to_log(logger.g_error) then
-        get_debug_info(
+        get_call_hierarchy(
           p_callstack => dbms_utility.format_call_stack,
-          o_unit => l_proc_name,
-          o_lineno => l_lineno);
+          o_unit_name => l_proc_name,
+          o_line_no => l_lineno,
+          o_call_depth => l_call_depth,
+          o_root_unit_name => l_root_unit,
+          o_call_id => l_call_id);
 
         l_call_stack := dbms_utility.format_error_stack() || gc_line_feed || dbms_utility.format_error_backtrace;
 
@@ -1206,7 +1351,10 @@ as
           p_text => l_text,
           p_call_stack => l_call_stack,
           p_line_no => l_lineno,
-          po_id => g_log_id);
+          po_id => g_log_id,
+          p_call_id => l_call_id,
+          p_call_depth => l_call_depth,
+          p_root_unit_name => l_root_unit);
 
         -- Plugin
         $if $$logger_plugin_error $then
@@ -2767,6 +2915,9 @@ as
    * @param p_line_no
    * @param p_extra
    * @param po_id ID entered into logger_logs for this record
+   * @param p_call_id
+   * @param p_call_depth
+   * @param p_root_unit_name
    */
   procedure ins_logger_logs(
     p_logger_level in logger_logs.logger_level%type,
@@ -2776,7 +2927,10 @@ as
     p_unit_name in logger_logs.unit_name%type default null,
     p_line_no in logger_logs.line_no%type default null,
     p_extra in logger_logs.extra%type default null,
-    po_id out nocopy logger_logs.id%type
+    po_id out nocopy logger_logs.id%type,
+    p_call_id in logger_logs.call_id%type default null,
+    p_call_depth in logger_logs.call_depth%type default null,
+    p_root_unit_name in logger_logs.root_unit_name%type default null
     )
   as
     pragma autonomous_transaction;
@@ -2824,7 +2978,8 @@ as
         scn,
         extra,
         sid,
-        client_info
+        client_info,
+        call_id, call_depth, root_unit_name
         )
        values(
          po_id, p_logger_level, l_text,
@@ -2836,7 +2991,8 @@ as
          null,
          l_extra,
          to_number(sys_context('userenv','sid')),
-         sys_context('userenv','client_info')
+         sys_context('userenv','client_info'),
+         p_call_id, p_call_depth, upper(p_root_unit_name)
          );
 
     $end -- $$NO_OP

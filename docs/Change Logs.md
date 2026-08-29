@@ -1,5 +1,10 @@
 This page contains all of Logger's Change Logs. Starting in version 3.0.0 onwards, only major tickets will be listed here. To see a complete list of all the issues for each version, review the appropriate release page.
 
+<a name="change-log-unreleased"></a>
+##Unreleased
+- Added automatic call-hierarchy correlation. `LOGGER_LOGS` gains three new columns, populated automatically whenever the call stack is captured (i.e. whenever `INCLUDE_CALL_STACK` is enabled, and always for `log_error`): `CALL_ID` (a correlation id shared by every log row belonging to one logical call chain), `CALL_DEPTH` (nesting depth of real PL/SQL frames - 1 means Logger was called directly from top-level code), and `ROOT_UNIT_NAME` (the outermost unit where the process started). No public procedure signatures changed; existing code and existing `INS_LOGGER_LOGS` callers keep working unmodified, since the three new `INS_LOGGER_LOGS` parameters are optional and default to null. `LOGGER_LOGS_5_MIN` and `LOGGER_LOGS_60_MIN` gain a `CALL_TREE` column that visually indents `UNIT_NAME` by `CALL_DEPTH` and are now ordered by `call_id, id`. See the "Grouping related log entries" section of [Best Practices](Best%20Practices.md) and the `INS_LOGGER_LOGS` section of [Logger API](Logger%20API.md).
+- On databases without `UTL_CALL_STACK` (pre-12.1), the immediate-caller `UNIT_NAME`/`LINE_NO` parsing was also made more robust: it now identifies Logger's own stack frames by package identity instead of a fixed line-offset. As a side effect, calls made through the `log_warn`/`log_info` short-alias wrappers on these older databases may now correctly attribute `UNIT_NAME`/`LINE_NO` to the true caller instead of the wrapper procedure - a one-frame difference from prior versions' output for that specific call path.
+
 <a name="change-log-3.1.0"></a>
 ##Change Log 3.1.0
 [Download](TODO_URL)<br/>

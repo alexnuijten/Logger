@@ -374,7 +374,10 @@ as
     p_unit_name in logger_logs.unit_name%type default null,
     p_line_no in logger_logs.line_no%type default null,
     p_extra in logger_logs.extra%type default null,
-    po_id out nocopy logger_logs.id%type
+    po_id out nocopy logger_logs.id%type,
+    p_call_id in logger_logs.call_id%type default null,
+    p_call_depth in logger_logs.call_depth%type default null,
+    p_root_unit_name in logger_logs.root_unit_name%type default null
   );
 
 

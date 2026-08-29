@@ -531,7 +531,7 @@ p_test2: test2' then
 
   -- Will not test date_text_format since it's dependant on current date and uses date_text_format_base
 
-  -- Will not test get_debug_info since it's too specific to where it's being called
+  -- get_call_hierarchy is exercised indirectly via the call_hierarchy test below
 
   procedure log_internal
   as
@@ -664,8 +664,6 @@ new line',
     end if;
   end get_character_codes;
 
-  -- FUTURE mdsouza: Add test for get_debug_info
-
   procedure ok_to_log
   as
     l_bool boolean;
@@ -770,6 +768,173 @@ new line',
         util_add_error('not logging');
     end;
   end log_error;
+
+
+  /**
+   * Verifies automatic call-hierarchy correlation (call_id/call_depth/root_unit_name):
+   *  - a chain of nested calls shares one call_id
+   *  - call_depth increases by exactly 1 at each nesting level
+   *  - root_unit_name is identical and correctly resolved across the chain
+   *  - the log_info short-alias wrapper isn't mistaken for the real caller
+   *  - log_error populates the hierarchy fields even when INCLUDE_CALL_STACK is FALSE
+   *
+   * Note: call_depth's absolute value depends on how deeply nested this test
+   * harness itself is (util_run_tests -> call_hierarchy -> p1 -> p2 -> p3), so
+   * assertions are relative (each level = previous + 1), not against a fixed
+   * base. The call_id "reset at depth = 1" trigger corresponds to a genuine
+   * top-level entry point calling Logger directly with no further PL/SQL
+   * nesting - this harness always adds its own nesting frames and so can't
+   * reliably reproduce that condition; validate it manually against a real
+   * entry point if needed.
+   */
+  procedure call_hierarchy
+  as
+    l_scope logger_logs.scope%type := util_get_unique_scope;
+
+    l_call_id_1 logger_logs.call_id%type;
+    l_call_id_2 logger_logs.call_id%type;
+    l_call_id_3 logger_logs.call_id%type;
+    l_depth_1 logger_logs.call_depth%type;
+    l_depth_2 logger_logs.call_depth%type;
+    l_depth_3 logger_logs.call_depth%type;
+    l_root_1 logger_logs.root_unit_name%type;
+    l_root_2 logger_logs.root_unit_name%type;
+    l_root_3 logger_logs.root_unit_name%type;
+
+    procedure p3 as
+    begin
+      logger.log_info('p3', l_scope);
+    end p3;
+
+    procedure p2 as
+    begin
+      logger.log_info('p2', l_scope);
+      p3;
+    end p2;
+
+    procedure p1 as
+    begin
+      logger.log_info('p1', l_scope);
+      p2;
+    end p1;
+
+  begin
+    g_proc_name := 'call_hierarchy';
+
+    logger.set_level(p_level => logger.g_debug);
+
+    -- Ensure INCLUDE_CALL_STACK is TRUE and force the cached pref to reload
+    update logger_prefs
+    set pref_value = 'TRUE'
+    where pref_type = logger.g_pref_type_logger
+      and pref_name = 'INCLUDE_CALL_STACK';
+
+    logger.save_global_context(
+      p_attribute => 'include_call_stack',
+      p_value => null);
+
+    p1;
+
+    begin
+      select call_id, call_depth, root_unit_name
+      into l_call_id_1, l_depth_1, l_root_1
+      from logger_logs_5_min
+      where scope = l_scope
+        and text = 'p1';
+
+      select call_id, call_depth, root_unit_name
+      into l_call_id_2, l_depth_2, l_root_2
+      from logger_logs_5_min
+      where scope = l_scope
+        and text = 'p2';
+
+      select call_id, call_depth, root_unit_name
+      into l_call_id_3, l_depth_3, l_root_3
+      from logger_logs_5_min
+      where scope = l_scope
+        and text = 'p3';
+    exception
+      when no_data_found then
+        util_add_error('call_hierarchy: not all 3 nested log calls were logged');
+    end;
+
+    if l_call_id_1 is null or l_call_id_2 is null or l_call_id_3 is null then
+      util_add_error('call_hierarchy: call_id was not populated');
+    elsif l_call_id_1 != l_call_id_2 or l_call_id_2 != l_call_id_3 then
+      util_add_error('call_hierarchy: nested calls did not share the same call_id');
+    end if;
+
+    if l_depth_1 is null or l_depth_2 is null or l_depth_3 is null then
+      util_add_error('call_hierarchy: call_depth was not populated');
+    elsif l_depth_2 != l_depth_1 + 1 or l_depth_3 != l_depth_2 + 1 then
+      util_add_error('call_hierarchy: call_depth did not increase by 1 at each nesting level ('
+        || l_depth_1 || ',' || l_depth_2 || ',' || l_depth_3 || ')');
+    end if;
+
+    if l_root_1 is null or l_root_1 != l_root_2 or l_root_2 != l_root_3 then
+      util_add_error('call_hierarchy: root_unit_name was not consistent across the chain');
+    elsif l_root_1 not like '%LOGGER_TEST%' then
+      util_add_error('call_hierarchy: root_unit_name did not resolve to the true entry point: ' || l_root_1);
+    end if;
+
+    -- log_info short-alias wrapper must not be mistaken for the real caller
+    declare
+      l_scope2 logger_logs.scope%type := util_get_unique_scope;
+      l_unit_name logger_logs.unit_name%type;
+    begin
+      logger.log_info('direct call via wrapper', l_scope2);
+
+      select unit_name
+      into l_unit_name
+      from logger_logs_5_min
+      where scope = l_scope2;
+
+      if l_unit_name is null or l_unit_name not like '%LOGGER_TEST%' then
+        util_add_error('call_hierarchy: log_info wrapper frame not correctly skipped, unit_name=' || l_unit_name);
+      end if;
+    exception
+      when no_data_found then
+        util_add_error('call_hierarchy: log_info wrapper call was not logged');
+    end;
+
+    -- log_error must populate hierarchy fields unconditionally, even with INCLUDE_CALL_STACK = FALSE
+    declare
+      l_scope3 logger_logs.scope%type := util_get_unique_scope;
+      l_call_id3 logger_logs.call_id%type;
+      l_depth3 logger_logs.call_depth%type;
+      l_root3 logger_logs.root_unit_name%type;
+    begin
+      update logger_prefs
+      set pref_value = 'FALSE'
+      where pref_type = logger.g_pref_type_logger
+        and pref_name = 'INCLUDE_CALL_STACK';
+
+      logger.save_global_context(
+        p_attribute => 'include_call_stack',
+        p_value => null);
+
+      begin
+        raise_application_error(-20001, 'call_hierarchy test error');
+      exception
+        when others then
+          logger.log_error('nested error', l_scope3);
+      end;
+
+      select call_id, call_depth, root_unit_name
+      into l_call_id3, l_depth3, l_root3
+      from logger_logs_5_min
+      where scope = l_scope3;
+
+      if l_call_id3 is null or l_depth3 is null or l_root3 is null then
+        util_add_error('call_hierarchy: log_error did not populate hierarchy fields with INCLUDE_CALL_STACK = FALSE');
+      end if;
+    exception
+      when no_data_found then
+        util_add_error('call_hierarchy: log_error call was not logged');
+    end;
+
+  end call_hierarchy;
+
 
   -- Test all log functions (except for log_error)
   procedure log_all_logs
@@ -1251,6 +1416,7 @@ new line',
     util_test_setup; get_character_codes; util_test_teardown;
     util_test_setup; ok_to_log; util_test_teardown;
     util_test_setup; log_error; util_test_teardown;
+    util_test_setup; call_hierarchy; util_test_teardown;
     util_test_setup; log_all_logs; util_test_teardown;
     util_test_setup; time_start; util_test_teardown;
     util_test_setup; time_stop; util_test_teardown;
