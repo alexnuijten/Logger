@@ -634,7 +634,6 @@ as
 
             exit when l_owner is null
               or l_subprogram.count = 0
-              or upper(l_owner) != upper($$plsql_unit_owner)
               or upper(l_subprogram(1)) not in ('LOGGER','LOGGER_NO_OP');
 
             l_i := l_i + 1;
@@ -688,10 +687,21 @@ as
               l_frame_name   := trim(regexp_replace(l_line, '^\S+\s+\d+\s+(.*)$', '\1'));
               l_trailing     := trim(substr(l_frame_name, instr(l_frame_name, ' ', -1, 1)));
 
-              l_is_logger := upper(l_trailing) in (
-                'LOGGER', 'LOGGER_NO_OP',
-                upper($$plsql_unit_owner) || '.LOGGER',
-                upper($$plsql_unit_owner) || '.LOGGER_NO_OP');
+              -- l_trailing is SCHEMA.PACKAGE.PROCEDURE (format_call_stack
+              -- includes the procedure name, not just SCHEMA.PACKAGE), so
+              -- match on the schema+package prefix rather than an exact
+              -- string, tolerating a bare SCHEMA.PACKAGE too (e.g. package
+              -- initialization frames) and an unqualified LOGGER/LOGGER_NO_OP
+              -- for defensiveness.
+              l_is_logger :=
+                upper(l_trailing) in ('LOGGER', 'LOGGER_NO_OP')
+                or upper(l_trailing) like 'LOGGER.%'
+                or upper(l_trailing) like 'LOGGER\_NO\_OP.%' escape '\'
+                or upper(l_trailing) in (
+                  upper($$plsql_unit_owner) || '.LOGGER',
+                  upper($$plsql_unit_owner) || '.LOGGER_NO_OP')
+                or upper(l_trailing) like upper($$plsql_unit_owner) || '.LOGGER.%'
+                or upper(l_trailing) like upper($$plsql_unit_owner) || '.LOGGER\_NO\_OP.%' escape '\';
 
               if l_skipping and l_is_logger then
                 null; -- still inside Logger's own frames, keep skipping
@@ -2582,6 +2592,13 @@ as
           p_value => logger.convert_level_char_to_num(l_level),
           p_client_id => p_client_id); -- Note: if p_client_id is null then it will set for global`
 
+        -- Keep the cached include_call_stack context in sync too, otherwise a
+        -- previously-cached value keeps winning until it separately expires/nulls.
+        logger.save_global_context(
+          p_attribute => gc_ctx_attr_include_call_stack,
+          p_value => l_include_call_stack,
+          p_client_id => p_client_id);
+
         -- Manual insert to ensure that data gets logged, regardless of logger_level
         logger.ins_logger_logs(
           p_logger_level => logger.g_information,
@@ -2939,11 +2956,27 @@ as
     l_text varchar2(32767) := p_text;
     l_extra logger_logs.extra%type := p_extra;
     l_tmp_clob clob;
+    l_user_name logger_logs.user_name%type;
 
   begin
     $if $$no_op $then
       null;
     $else
+      -- apex_application.g_user raises ORA-20987 when accessed outside a
+      -- genuine APEX session (e.g. calling Logger directly via SQL*Plus/SQLcl
+      -- in a schema where APEX happens to be installed) - fall back to USER.
+      begin
+        $if $$apex $then
+          l_user_name := apex_application.g_user;
+        $else
+          l_user_name := user;
+        $end
+      exception
+        when others then
+          l_user_name := user;
+      end;
+      l_user_name := nvl(l_user_name, user);
+
       -- Using select into to support version older than 11gR1 (see Issue 26)
       select logger_logs_seq.nextval
       into po_id
@@ -2985,7 +3018,7 @@ as
          po_id, p_logger_level, l_text,
          systimestamp, lower(p_scope), sys_context('userenv','module'),
          sys_context('userenv','action'),
-         nvl($if $$apex $then apex_application.g_user $else user $end,user),
+         l_user_name,
          sys_context('userenv','client_identifier'),
          p_call_stack, upper(p_unit_name), p_line_no,
          null,

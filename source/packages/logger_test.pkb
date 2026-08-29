@@ -871,10 +871,12 @@ new line',
         || l_depth_1 || ',' || l_depth_2 || ',' || l_depth_3 || ')');
     end if;
 
+    -- root_unit_name is whatever originally invoked util_run_tests (typically an
+    -- anonymous block, e.g. "begin logger_test.util_run_tests; end;") - not
+    -- something this test controls, so only its consistency across the chain
+    -- can be asserted, not a specific expected value.
     if l_root_1 is null or l_root_1 != l_root_2 or l_root_2 != l_root_3 then
       util_add_error('call_hierarchy: root_unit_name was not consistent across the chain');
-    elsif l_root_1 not like '%LOGGER_TEST%' then
-      util_add_error('call_hierarchy: root_unit_name did not resolve to the true entry point: ' || l_root_1);
     end if;
 
     -- log_info short-alias wrapper must not be mistaken for the real caller
@@ -1076,7 +1078,9 @@ new line',
       p_log_in_table => false
     );
 
-    apex_util.pause(l_sleep_time + 0.1);
+    -- Not apex_util.pause: it also requires a genuine APEX session, same as
+    -- apex_application.g_user, and this test suite must run outside one too.
+    dbms_session.sleep(l_sleep_time + 0.1);
 
     logger.time_stop(
       p_unit => l_unit_name,
@@ -1112,7 +1116,9 @@ new line',
       p_log_in_table => false
     );
 
-    apex_util.pause(l_sleep_time + 0.1);
+    -- Not apex_util.pause: it also requires a genuine APEX session, same as
+    -- apex_application.g_user, and this test suite must run outside one too.
+    dbms_session.sleep(l_sleep_time + 0.1);
 
     l_text := logger.time_stop(p_unit => l_unit_name);
 
@@ -1138,7 +1144,7 @@ new line',
       p_log_in_table => false
     );
 
-    apex_util.pause(l_sleep_time + 0.05);
+    dbms_session.sleep(l_sleep_time + 0.05);
 
     l_text := logger.time_stop_seconds(p_unit => l_unit_name);
 
